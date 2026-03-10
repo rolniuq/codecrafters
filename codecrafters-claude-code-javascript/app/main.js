@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { readFileSync } from "fs";
 
 async function main() {
   const [, , flag, prompt] = process.argv;
@@ -21,6 +22,25 @@ async function main() {
   const response = await client.chat.completions.create({
     model: "anthropic/claude-haiku-4.5",
     messages: [{ role: "user", content: prompt }],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "Read",
+          description: "Read and return the contents of a file",
+          parameters: {
+            type: "object",
+            properties: {
+              file_path: {
+                type: "string",
+                description: "The path to the file to read",
+              },
+            },
+            required: ["file_path"],
+          },
+        },
+      },
+    ],
   });
 
   if (!response.choices || response.choices.length === 0) {
@@ -31,7 +51,14 @@ async function main() {
   console.error("Logs from your program will appear here!");
 
   // TODO: Uncomment the lines below to pass the first stage
-  console.log(response.choices[0].message.content);
+  if (response?.choices[0]?.message?.tool_calls) {
+    const tool = response?.choices[0]?.message?.tool_calls[0];
+    const args = JSON.parse(tool.function.arguments);
+    const buffer = readFileSync(args.file_path, "utf-8");
+    console.log(buffer);
+  } else {
+    console.log(response.choices[0].message.content);
+  }
 }
 
 main();
